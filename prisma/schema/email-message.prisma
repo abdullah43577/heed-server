@@ -1,3 +1,26 @@
+enum EmailCategory {
+  NEEDS_REPLY
+  IMPORTANT
+  ROUTINE
+  NEWSLETTER
+  PROMOTION
+  UNSURE
+}
+
+enum EmailAction {
+  MARKED_READ
+  LEFT_UNREAD
+  AWAITING_REPLY
+  UNDONE
+}
+
+enum TriageSource {
+  RULE
+  HEADER
+  AI
+  FALLBACK
+}
+
 model EmailMessage {
   id            String      @id @default(cuid())
   userId        String
@@ -12,8 +35,18 @@ model EmailMessage {
   subject        String
   receivedAt     DateTime
 
+  // Null until triaged; the sync's next pass picks up anything still null.
+  category       EmailCategory?
+  action         EmailAction?
+  decidedBy      TriageSource?
+  summary        String?
+  reason         String?
+  triageAttempts Int           @default(0)
+  triagedAt      DateTime?
+
   createdAt DateTime @default(now())
 
   @@unique([mailAccountId, gmailMessageId])
   @@index([userId, receivedAt])
+  @@index([mailAccountId, category])
 }

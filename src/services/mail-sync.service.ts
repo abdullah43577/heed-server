@@ -11,13 +11,13 @@ import { redis } from "../lib/redis-connection";
 import { EmailMessageRepository } from "../repositories/email-message.repository";
 import { MailAccountRepository } from "../repositories/mail-account.repository";
 import { MailAccountService } from "./mail-account.service";
+import { TriageService } from "./triage.service";
 
 const LOCK_TTL_SECONDS = 120;
 const FETCH_CONCURRENCY = 5;
 const FALLBACK_OVERLAP_MS = 5 * 60 * 1000;
 
 const lockKey = (accountId: string) => `sync-lock:${accountId}`;
-
 
 interface SyncableAccount {
   id: string;
@@ -26,12 +26,15 @@ interface SyncableAccount {
   refreshTokenEnc: string;
   historyId: string | null;
   lastSyncedAt: Date | null;
+  handledLabelId: string | null;
+  replyLabelId: string | null;
 }
 
 export class MailSyncService {
   private mailAccountRepo = new MailAccountRepository();
   private emailMessageRepo = new EmailMessageRepository();
   private mailAccountService = new MailAccountService();
+  private triageService = new TriageService();
 
   async syncAllAccounts() {
     try {
@@ -71,6 +74,7 @@ export class MailSyncService {
       const { ids, historyId } = await this.findNewMessageIds(client, account);
       const added = await this.storeNew(client, account, ids);
       await this.saveCursor(account, historyId, startedAt);
+      await this.triageService.triagePending(client, account);
 
       return added;
     } catch (error) {

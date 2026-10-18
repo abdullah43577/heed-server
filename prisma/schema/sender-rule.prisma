@@ -1,0 +1,17 @@
+enum SenderRuleKind {
+  ALWAYS_LEAVE
+}
+
+model SenderRule {
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // A lowercased address, or "@domain" for a whole domain.
+  pattern String
+  kind    SenderRuleKind
+
+  createdAt DateTime @default(now())
+
+  @@unique([userId, pattern])
+}

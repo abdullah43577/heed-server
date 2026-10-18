@@ -28,7 +28,16 @@ export class MailAccountRepository {
   async findActiveForSync() {
     return prisma.mailAccount.findMany({
       where: { status: "ACTIVE" },
-      select: { id: true, userId: true, email: true, refreshTokenEnc: true, historyId: true, lastSyncedAt: true },
+      select: {
+        id: true,
+        userId: true,
+        email: true,
+        refreshTokenEnc: true,
+        historyId: true,
+        lastSyncedAt: true,
+        handledLabelId: true,
+        replyLabelId: true,
+      },
     });
   }
 

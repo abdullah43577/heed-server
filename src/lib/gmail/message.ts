@@ -1,4 +1,5 @@
 import type { gmail_v1 } from "@googleapis/gmail";
+import { extractBodyText } from "../triage/text";
 
 const SKIPPED_LABELS = ["SENT", "DRAFT", "SPAM", "TRASH", "CHAT"];
 
@@ -18,6 +19,43 @@ const parseAddress = function (value: string) {
   const match = value.match(/^\s*"?([^"<]*?)"?\s*<([^>]+)>\s*$/);
   if (match) return { name: match[1]?.trim() || null, email: match[2]!.trim().toLowerCase() };
   return { name: null, email: value.trim().toLowerCase() };
+};
+
+export interface FullMessage {
+  labels: string[];
+  to: string;
+  cc: string;
+  date: string;
+  listUnsubscribe: string;
+  precedence: string;
+  bodyText: string;
+}
+
+export const fetchFullMessage = async function (client: gmail_v1.Gmail, id: string): Promise<FullMessage> {
+  const { data } = await client.users.messages.get({ userId: "me", id, format: "full" });
+  const headers = data.payload?.headers ?? [];
+
+  return {
+    labels: data.labelIds ?? [],
+    to: header(headers, "To"),
+    cc: header(headers, "Cc"),
+    date: header(headers, "Date"),
+    listUnsubscribe: header(headers, "List-Unsubscribe"),
+    precedence: header(headers, "Precedence"),
+    bodyText: extractBodyText(data.payload),
+  };
+};
+
+export const modifyLabels = async function (
+  client: gmail_v1.Gmail,
+  id: string,
+  change: { add?: string[]; remove?: string[] },
+) {
+  await client.users.messages.modify({
+    userId: "me",
+    id,
+    requestBody: { addLabelIds: change.add ?? [], removeLabelIds: change.remove ?? [] },
+  });
 };
 
 // Null for anything Heed should not treat as new mail: outgoing, drafts, spam,

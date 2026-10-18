@@ -2,13 +2,16 @@ import { AiQuotaExceededError, AiUnavailableError } from "./errors";
 import { redis } from "./redis-connection";
 
 const DAILY_LIMIT = 50;
+const TRIAGE_DAILY_LIMIT = 500;
 const KEY_TTL_SECONDS = 2 * 24 * 60 * 60;
 // The connection sets maxRetriesPerRequest: null, so a command against a dead
 // Redis waits forever. Failing closed needs a deadline of its own.
 const REDIS_DEADLINE_MS = 2000;
 
+const today = () => new Date().toISOString().slice(0, 10);
+
 const quotaKey = function (userId: string) {
-  return `ai-quota:${userId}:${new Date().toISOString().slice(0, 10)}`;
+  return `ai-quota:${userId}:${today()}`;
 };
 
 const withDeadline = function <T>(work: Promise<T>): Promise<T> {
@@ -35,13 +38,21 @@ export const assertAiQuota = async function (userId: string) {
   }
 };
 
-export const consumeAiQuota = async function (userId: string) {
+const consume = async function (key: string, limit: number) {
   try {
-    const key = quotaKey(userId);
     const used = await withDeadline(redis.incr(key));
     if (used === 1) await withDeadline(redis.expire(key, KEY_TTL_SECONDS));
-    if (used > DAILY_LIMIT) throw new AiQuotaExceededError();
+    if (used > limit) throw new AiQuotaExceededError();
   } catch (error) {
     failClosed(error);
   }
+};
+
+export const consumeAiQuota = async function (userId: string) {
+  await consume(quotaKey(userId), DAILY_LIMIT);
+};
+
+// Triage is per email, so it has its own budget: a busy inbox must not spend the user's drafting allowance.
+export const consumeTriageQuota = async function (mailAccountId: string) {
+  await consume(`triage-quota:${mailAccountId}:${today()}`, TRIAGE_DAILY_LIMIT);
 };

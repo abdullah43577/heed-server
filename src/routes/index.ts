@@ -4,6 +4,7 @@ import { authRouter } from "./auth.routes";
 import { emailMessageRouter } from "./email-message.routes";
 import { mailAccountRouter } from "./mail-account.routes";
 import { maintenanceRouter } from "./maintenance.routes";
+import { senderRuleRouter } from "./sender-rule.routes";
 import { notificationRouter } from "./notification.routes";
 
 export const registerRoutes = (app: Application) => {
@@ -11,6 +12,7 @@ export const registerRoutes = (app: Application) => {
   app.use("/v1/notifications", notificationRouter);
   app.use("/v1/mail-accounts", mailAccountRouter);
   app.use("/v1/messages", emailMessageRouter);
+  app.use("/v1/rules", senderRuleRouter);
   app.use("/v1/maintenance", maintenanceRouter);
 
   app.use((req: Request, res: Response) => {

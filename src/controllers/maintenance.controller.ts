@@ -28,13 +28,17 @@ const assertCronSecret = function (req: Request) {
 export class MaintenanceController {
   private mailSyncService = new MailSyncService();
 
-  // For hosts that sleep when idle: the call wakes the server and runs one sync pass.
+  // For hosts that sleep when idle: the call wakes the server and starts one sync pass.
+  // It answers before the pass ends, because triage can outlast a cron service's timeout.
   async runMailSync(req: Request, res: Response) {
     try {
       assertCronSecret(req);
 
-      const result = await this.mailSyncService.syncAllAccounts();
-      res.status(200).json({ message: "Mail sync completed", data: result });
+      this.mailSyncService
+        .syncAllAccounts()
+        .catch(error => console.error("Mail sync from cron failed:", error));
+
+      res.status(202).json({ message: "Mail sync started" });
     } catch (error) {
       handleErrors({ res, error });
     }
