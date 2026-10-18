@@ -3,6 +3,7 @@ import { configureApp } from "./config";
 import { registerRoutes } from "./routes";
 import { getEnv } from "./lib/get-env";
 import { checkRedisHealth } from "./lib/redis-connection";
+import { startScheduler } from "./lib/scheduler";
 
 const PORT = getEnv("PORT");
 
@@ -21,6 +22,7 @@ const server = app.listen(PORT, async () => {
     console.log(`✅ Server started on http://localhost:${PORT}`);
 
     await checkRedisHealth();
+    startScheduler();
   } catch (error) {
     console.error("❌ Error starting server:", error);
     console.error("Stack trace:", error instanceof Error ? error.stack : "No stack trace");

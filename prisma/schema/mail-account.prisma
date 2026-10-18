@@ -16,6 +16,11 @@ model MailAccount {
   handledLabelId String?
   replyLabelId   String?
 
+  historyId    String?
+  lastSyncedAt DateTime?
+
+  messages EmailMessage[]
+
   connectedAt DateTime @default(now())
   updatedAt   DateTime @updatedAt
 

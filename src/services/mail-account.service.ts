@@ -2,6 +2,7 @@ import { randomBytes } from "node:crypto";
 import { decrypt, encrypt } from "../lib/crypto";
 import { AccountLimitError, NotFoundError, OAuthCallbackError } from "../lib/errors";
 import { forgetAccessToken, getAccessToken, gmailFor, GmailAccessRevokedError } from "../lib/gmail/client";
+import { getCurrentHistoryId } from "../lib/gmail/history";
 import { ensureHeedLabels } from "../lib/gmail/labels";
 import { buildAuthUrl, exchangeCode, GMAIL_SCOPE, revokeToken } from "../lib/gmail/oauth";
 import { redis } from "../lib/redis-connection";
@@ -103,7 +104,7 @@ export class MailAccountService {
       });
 
       await forgetAccessToken(account.id);
-      await this.prepareLabels(userId, account);
+      await this.prepareMailbox(userId, account);
 
       return { email: account.email, returnUrl: pending.returnUrl };
     } catch (error) {
@@ -126,13 +127,8 @@ export class MailAccountService {
     }
   }
 
-  private async checkAccess(userId: string, account: { id: string; email: string; refreshTokenEnc: string }) {
+  async markNeedsReauth(userId: string, account: { id: string; email: string }) {
     try {
-      await withTimeout(getAccessToken(account), ACCESS_CHECK_TIMEOUT_MS);
-      return true;
-    } catch (error) {
-      if (!(error instanceof GmailAccessRevokedError)) return true;
-
       await this.mailAccountRepo.updateStatus(account.id, userId, "NEEDS_REAUTH");
       await this.notificationService.notify({
         userId,
@@ -142,17 +138,41 @@ export class MailAccountService {
         entityType: "mail-account",
         entityId: account.id,
       });
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  private async checkAccess(userId: string, account: { id: string; email: string; refreshTokenEnc: string }) {
+    try {
+      await withTimeout(getAccessToken(account), ACCESS_CHECK_TIMEOUT_MS);
+      return true;
+    } catch (error) {
+      if (!(error instanceof GmailAccessRevokedError)) return true;
+
+      await this.markNeedsReauth(userId, account);
       return false;
     }
   }
 
-  // Labels are only needed once triage runs, so a failure here must not fail the connection.
-  private async prepareLabels(userId: string, account: { id: string; refreshTokenEnc: string }) {
+  // Labels are only needed once triage runs and the sync sets its own cursor when
+  // missing, so neither failure may fail the connection.
+  private async prepareMailbox(
+    userId: string,
+    account: { id: string; refreshTokenEnc: string; historyId: string | null },
+  ) {
     try {
-      const labels = await ensureHeedLabels(await gmailFor(account));
-      await this.mailAccountRepo.updateLabels(account.id, userId, labels);
+      const client = await gmailFor(account);
+      await this.mailAccountRepo.updateLabels(account.id, userId, await ensureHeedLabels(client));
+
+      if (!account.historyId) {
+        await this.mailAccountRepo.updateSyncCursor(account.id, userId, {
+          historyId: await getCurrentHistoryId(client),
+          lastSyncedAt: new Date(),
+        });
+      }
     } catch (error) {
-      console.error("[gmail] could not prepare labels:", (error as Error).message);
+      console.error("[gmail] could not prepare mailbox:", (error as Error).message);
     }
   }
 }

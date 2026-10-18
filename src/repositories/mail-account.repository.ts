@@ -24,6 +24,14 @@ export class MailAccountRepository {
     });
   }
 
+  // The sync worker's entry point, and the one cross-user read: every call after it carries the row's userId.
+  async findActiveForSync() {
+    return prisma.mailAccount.findMany({
+      where: { status: "ACTIVE" },
+      select: { id: true, userId: true, email: true, refreshTokenEnc: true, historyId: true, lastSyncedAt: true },
+    });
+  }
+
   async findById(id: string, userId: string) {
     return prisma.mailAccount.findFirst({ where: { id, userId } });
   }
@@ -46,6 +54,10 @@ export class MailAccountRepository {
 
   async updateLabels(id: string, userId: string, labels: { handledLabelId: string; replyLabelId: string }) {
     return prisma.mailAccount.update({ where: { id, userId }, data: labels });
+  }
+
+  async updateSyncCursor(id: string, userId: string, cursor: { historyId: string; lastSyncedAt: Date }) {
+    return prisma.mailAccount.update({ where: { id, userId }, data: cursor });
   }
 
   async updateStatus(id: string, userId: string, status: MailAccountStatus) {

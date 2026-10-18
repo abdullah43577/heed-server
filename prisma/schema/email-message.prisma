@@ -1,0 +1,19 @@
+model EmailMessage {
+  id            String      @id @default(cuid())
+  userId        String
+  user          User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  mailAccountId String
+  mailAccount   MailAccount @relation(fields: [mailAccountId], references: [id], onDelete: Cascade)
+
+  gmailMessageId String
+  gmailThreadId  String
+  fromName       String?
+  fromEmail      String
+  subject        String
+  receivedAt     DateTime
+
+  createdAt DateTime @default(now())
+
+  @@unique([mailAccountId, gmailMessageId])
+  @@index([userId, receivedAt])
+}

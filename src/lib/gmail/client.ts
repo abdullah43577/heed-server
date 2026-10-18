@@ -17,6 +17,11 @@ interface TokenSource {
 
 const tokenKey = (accountId: string) => `gmail-token:${accountId}`;
 
+export const isGmailNotFound = function (error: unknown) {
+  const failure = error as { status?: number; response?: { status?: number } };
+  return (failure.status ?? failure.response?.status) === 404;
+};
+
 const isInvalidGrant = function (error: unknown) {
   const data = (error as { response?: { data?: { error?: string } } }).response?.data;
   return data?.error === "invalid_grant" || String((error as Error).message).includes("invalid_grant");
