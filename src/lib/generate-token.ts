@@ -1,5 +1,5 @@
 import "dotenv/config";
-const { ACCESS_TOKEN_SECRET, REFRESH_TOKEN_SECRET, GOOGLE_VERIFICATION_TOKEN } = getEnv(["ACCESS_TOKEN_SECRET", "REFRESH_TOKEN_SECRET", "GOOGLE_VERIFICATION_TOKEN"]);
+const { ACCESS_TOKEN_SECRET, REFRESH_TOKEN_SECRET } = getEnv(["ACCESS_TOKEN_SECRET", "REFRESH_TOKEN_SECRET"]);
 import jwt, { type Secret } from "jsonwebtoken";
 import { getEnv } from "./get-env";
 
@@ -13,8 +13,4 @@ export const generateAccessToken = (dataObj: Payload) => {
 
 export const generateRefreshToken = (dataObj: Payload) => {
   return jwt.sign(dataObj, REFRESH_TOKEN_SECRET as Secret, { expiresIn: "7d" });
-};
-
-export const generateGoogleVerificationToken = (dataObj: Payload) => {
-  return jwt.sign(dataObj, GOOGLE_VERIFICATION_TOKEN as Secret, { expiresIn: "2m" });
 };

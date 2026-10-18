@@ -1,5 +1,6 @@
 enum NotificationType {
   SYSTEM
+  ACCOUNT_NEEDS_REAUTH
 }
 
 model Notification {

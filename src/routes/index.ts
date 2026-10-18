@@ -1,11 +1,13 @@
 import type { Application, NextFunction, Request, Response } from "express";
 import { handleErrors } from "../lib/handle-errors";
 import { authRouter } from "./auth.routes";
+import { mailAccountRouter } from "./mail-account.routes";
 import { notificationRouter } from "./notification.routes";
 
 export const registerRoutes = (app: Application) => {
   app.use("/v1/auth", authRouter);
   app.use("/v1/notifications", notificationRouter);
+  app.use("/v1/mail-accounts", mailAccountRouter);
 
   app.use((req: Request, res: Response) => {
     res.status(404).json({

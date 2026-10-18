@@ -22,4 +22,5 @@ model User {
 
   settings      UserSettings?
   notifications Notification[]
+  mailAccounts  MailAccount[]
 }

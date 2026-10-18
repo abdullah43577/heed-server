@@ -58,3 +58,20 @@ export class AiQuotaExceededError extends AppError {
     super(message, 429, "AI_QUOTA_EXCEEDED");
   }
 }
+
+export class AccountLimitError extends AppError {
+  constructor(message = "You can connect up to five Gmail accounts.") {
+    super(message, 409, "ACCOUNT_LIMIT");
+  }
+}
+
+// Raised inside the OAuth callback, which answers with a redirect rather than JSON;
+// the code travels to the app in the redirect url.
+export class OAuthCallbackError extends AppError {
+  constructor(
+    code: string,
+    public readonly returnUrl?: string,
+  ) {
+    super("Could not connect that Gmail account.", 400, code);
+  }
+}
