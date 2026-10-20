@@ -1,0 +1,17 @@
+model DailyReport {
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // yyyy-mm-dd in the user's timezone; the unique key makes a second sweep a no-op.
+  reportDate  String
+  periodStart DateTime
+  periodEnd   DateTime
+  totals      Json
+  headline    String
+
+  createdAt DateTime @default(now())
+
+  @@unique([userId, reportDate])
+  @@index([userId, periodEnd])
+}

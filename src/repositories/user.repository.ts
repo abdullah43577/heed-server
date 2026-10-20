@@ -26,7 +26,10 @@ export class UserRepository {
     });
   }
 
-  async upsertUserSettings(userId: string, data: Partial<{ theme: $Enums.Theme; notifications: boolean }>) {
+  async upsertUserSettings(
+    userId: string,
+    data: Partial<{ theme: $Enums.Theme; notifications: boolean; reportTime: string; timezone: string }>,
+  ) {
     return prisma.userSettings.upsert({
       where: { userId },
       update: data,

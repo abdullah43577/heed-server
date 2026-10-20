@@ -10,4 +10,8 @@ model UserSettings {
   user          User    @relation(fields: [userId], references: [id], onDelete: Cascade)
   theme         Theme   @default(SYSTEM)
   notifications Boolean @default(true)
+
+  // "HH:mm" in the user's own timezone, an IANA name sent by the client.
+  reportTime String @default("18:00")
+  timezone   String @default("UTC")
 }

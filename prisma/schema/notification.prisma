@@ -1,6 +1,7 @@
 enum NotificationType {
   SYSTEM
   ACCOUNT_NEEDS_REAUTH
+  DAILY_REPORT
 }
 
 model Notification {

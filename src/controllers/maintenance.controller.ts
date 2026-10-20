@@ -3,6 +3,7 @@ import { type Request, type Response } from "express";
 import { UnauthorizedError } from "../lib/errors";
 import { getEnv } from "../lib/get-env";
 import { handleErrors } from "../lib/handle-errors";
+import { DailyReportService } from "../services/daily-report.service";
 import { MailSyncService } from "../services/mail-sync.service";
 
 // Hash both sides first: timingSafeEqual throws on a length mismatch.
@@ -27,6 +28,7 @@ const assertCronSecret = function (req: Request) {
 
 export class MaintenanceController {
   private mailSyncService = new MailSyncService();
+  private dailyReportService = new DailyReportService();
 
   // For hosts that sleep when idle: the call wakes the server and starts one sync pass.
   // It answers before the pass ends, because triage can outlast a cron service's timeout.
@@ -39,6 +41,28 @@ export class MaintenanceController {
         .catch(error => console.error("Mail sync from cron failed:", error));
 
       res.status(202).json({ message: "Mail sync started" });
+    } catch (error) {
+      handleErrors({ res, error });
+    }
+  }
+
+  async runReportSweep(req: Request, res: Response) {
+    try {
+      assertCronSecret(req);
+
+      const result = await this.dailyReportService.sweep();
+      res.status(200).json({ message: "Report sweep finished", data: result });
+    } catch (error) {
+      handleErrors({ res, error });
+    }
+  }
+
+  async runRetention(req: Request, res: Response) {
+    try {
+      assertCronSecret(req);
+
+      const result = await this.dailyReportService.applyRetention();
+      res.status(200).json({ message: "Retention finished", data: result });
     } catch (error) {
       handleErrors({ res, error });
     }

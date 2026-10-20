@@ -45,6 +45,22 @@ export class EmailMessageRepository {
     });
   }
 
+  async findTriagedBetween(userId: string, start: Date, end: Date) {
+    return prisma.emailMessage.findMany({
+      where: { userId, category: { not: null }, receivedAt: { gte: start, lt: end } },
+      include: messageInclude,
+      orderBy: { receivedAt: "desc" },
+      take: 1000,
+    });
+  }
+
+  // Retention, across every user. A message still waiting on a reply keeps its row until it is dealt with.
+  async deleteReceivedBefore(before: Date) {
+    return prisma.emailMessage.deleteMany({
+      where: { receivedAt: { lt: before }, OR: [{ action: null }, { action: { not: "AWAITING_REPLY" } }] },
+    });
+  }
+
   async findById(id: string, userId: string) {
     return prisma.emailMessage.findFirst({ where: { id, userId }, include: messageInclude });
   }

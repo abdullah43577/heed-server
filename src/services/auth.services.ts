@@ -305,6 +305,8 @@ export class AuthService {
       return await this.userRepo.upsertUserSettings(userId, {
         ...(data.theme && { theme: data.theme }),
         ...(data.notifications !== undefined && { notifications: data.notifications }),
+        ...(data.reportTime && { reportTime: data.reportTime }),
+        ...(data.timezone && { timezone: data.timezone }),
       });
     } catch (error) {
       throw error;
