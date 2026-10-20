@@ -12,6 +12,8 @@ router.use(validateAccessToken);
 
 router.get("/", mailAccountController.getAccounts.bind(mailAccountController));
 router.post("/connect", mailAccountController.connect.bind(mailAccountController));
+router.patch("/:id", mailAccountController.update.bind(mailAccountController));
+router.post("/:id/learn-style", mailAccountController.learnStyle.bind(mailAccountController));
 router.delete("/:id", mailAccountController.disconnect.bind(mailAccountController));
 
 export { router as mailAccountRouter };

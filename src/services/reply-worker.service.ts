@@ -64,7 +64,7 @@ export class ReplyWorkerService {
         const client = await gmailFor(account);
         const body = await this.drafting.compose(
           client,
-          await this.drafting.authorFor(message.userId, account.email),
+          await this.drafting.authorFor(message.userId, account),
           message,
         );
         await this.draftRepo.create({ userId: message.userId, emailMessageId: message.id, body });
@@ -170,7 +170,7 @@ export class ReplyWorkerService {
       const recipients = computeRecipients(headers, account.email, draft.replyAll);
       if (recipients.to.length === 0) throw new Error("no recipients");
 
-      const author = await this.drafting.authorFor(userId, account.email);
+      const author = await this.drafting.authorFor(userId, account);
       const raw = await buildReplyRaw({
         fromName: author.name,
         fromEmail: account.email,

@@ -9,6 +9,7 @@ import { UserRepository } from "../repositories/user.repository";
 export interface DraftAuthor {
   name: string | null;
   email: string;
+  styleNote: string | null;
 }
 
 interface DraftSource {
@@ -26,10 +27,10 @@ const groundingSources = (thread: ThreadMessage[], subject: string, extra: strin
 export class DraftingService {
   private userRepo = new UserRepository();
 
-  async authorFor(userId: string, accountEmail: string): Promise<DraftAuthor> {
+  async authorFor(userId: string, account: { email: string; styleNote: string | null }): Promise<DraftAuthor> {
     const user = await this.userRepo.findById(userId, { first_name: true, last_name: true });
     const name = [user?.first_name, user?.last_name].filter(Boolean).join(" ").trim();
-    return { name: name || null, email: accountEmail };
+    return { name: name || null, email: account.email, styleNote: account.styleNote };
   }
 
   async compose(client: gmail_v1.Gmail, author: DraftAuthor, message: DraftSource) {

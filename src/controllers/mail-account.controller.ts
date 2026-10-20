@@ -4,8 +4,9 @@ import { AppError, OAuthCallbackError } from "../lib/errors";
 import { getEnv } from "../lib/get-env";
 import { handleErrors } from "../lib/handle-errors";
 import { oauthReturnPage } from "../lib/templates/oauth-return";
-import { connectMailAccountSchema, oauthCallbackQuerySchema } from "../schemas/mail-account";
+import { connectMailAccountSchema, oauthCallbackQuerySchema, updateMailAccountSchema } from "../schemas/mail-account";
 import { MailAccountService } from "../services/mail-account.service";
+import { WritingStyleService } from "../services/writing-style.service";
 
 const APP_CALLBACK_URL = getEnv("APP_CALLBACK_URL") ?? "heed://oauth/callback";
 
@@ -14,6 +15,32 @@ const appUrl = (base: string | undefined, params: Record<string, string>) =>
 
 export class MailAccountController {
   private mailAccountService = new MailAccountService();
+  private writingStyleService = new WritingStyleService();
+
+  async learnStyle(req: IUserRequest, res: Response) {
+    try {
+      const { userId } = req;
+      const { id } = req.params;
+
+      const account = await this.writingStyleService.learn(id as string, userId!);
+      res.status(200).json({ message: "Heed learned how you write", data: account });
+    } catch (error) {
+      handleErrors({ res, error });
+    }
+  }
+
+  async update(req: IUserRequest, res: Response) {
+    try {
+      const { userId } = req;
+      const { id } = req.params;
+      const { styleNote } = updateMailAccountSchema.parse(req.body);
+
+      const account = await this.writingStyleService.update(id as string, userId!, styleNote);
+      res.status(200).json({ message: "Writing style saved", data: account });
+    } catch (error) {
+      handleErrors({ res, error });
+    }
+  }
 
   async getAccounts(req: IUserRequest, res: Response) {
     try {

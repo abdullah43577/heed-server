@@ -6,6 +6,8 @@ const publicSelect = {
   email: true,
   status: true,
   connectedAt: true,
+  styleNote: true,
+  styleLearnedAt: true,
 } as const;
 
 export interface UpsertMailAccountData {
@@ -67,6 +69,10 @@ export class MailAccountRepository {
 
   async updateSyncCursor(id: string, userId: string, cursor: { historyId: string; lastSyncedAt: Date }) {
     return prisma.mailAccount.update({ where: { id, userId }, data: cursor });
+  }
+
+  async updateStyleNote(id: string, userId: string, data: { styleNote: string | null; styleLearnedAt?: Date | null }) {
+    return prisma.mailAccount.update({ where: { id, userId }, data, select: publicSelect });
   }
 
   async updateStatus(id: string, userId: string, status: MailAccountStatus) {

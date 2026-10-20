@@ -19,6 +19,10 @@ model MailAccount {
   historyId    String?
   lastSyncedAt DateTime?
 
+  // How the user writes from this address, learned from Sent and editable; every draft follows it.
+  styleNote      String?
+  styleLearnedAt DateTime?
+
   messages    EmailMessage[]
   backlogRuns BacklogRun[]
 

@@ -34,7 +34,7 @@ export class ReplyDraftService {
       if (!draft) throw new NotFoundError("Draft not found");
 
       const message = draft.emailMessage;
-      const view = await this.withGmail(userId, message.mailAccountId, async (client, accountEmail) => {
+      const view = await this.withGmail(userId, message.mailAccountId, async (client, account) => {
         const [thread, headers] = await Promise.all([
           fetchThread(client, message.gmailThreadId),
           fetchReplyHeaders(client, message.gmailMessageId),
@@ -42,8 +42,8 @@ export class ReplyDraftService {
         return {
           thread,
           recipients: {
-            reply: computeRecipients(headers, accountEmail, false),
-            replyAll: computeRecipients(headers, accountEmail, true),
+            reply: computeRecipients(headers, account.email, false),
+            replyAll: computeRecipients(headers, account.email, true),
           },
         };
       }).catch(error => {
@@ -75,8 +75,8 @@ export class ReplyDraftService {
       if (existing && OPEN_DRAFT_STATUSES.includes(existing.status)) return await this.getDraft(existing.id, userId);
 
       await consumeAiQuota(userId);
-      const body = await this.withGmail(userId, message.mailAccountId, async (client, accountEmail) =>
-        this.drafting.compose(client, await this.drafting.authorFor(userId, accountEmail), message),
+      const body = await this.withGmail(userId, message.mailAccountId, async (client, account) =>
+        this.drafting.compose(client, await this.drafting.authorFor(userId, account), message),
       ).catch(this.mapGmailNotFound);
 
       let draftId: string;
@@ -130,10 +130,10 @@ export class ReplyDraftService {
       const currentBody = data.body ?? draft.body;
 
       await consumeAiQuota(userId);
-      const body = await this.withGmail(userId, draft.emailMessage.mailAccountId, async (client, accountEmail) =>
+      const body = await this.withGmail(userId, draft.emailMessage.mailAccountId, async (client, account) =>
         this.drafting.recompose(
           client,
-          await this.drafting.authorFor(userId, accountEmail),
+          await this.drafting.authorFor(userId, account),
           draft.emailMessage,
           currentBody,
           instruction,
@@ -162,8 +162,8 @@ export class ReplyDraftService {
       }
 
       const message = draft.emailMessage;
-      const recipients = await this.withGmail(userId, message.mailAccountId, async (client, accountEmail) =>
-        computeRecipients(await fetchReplyHeaders(client, message.gmailMessageId), accountEmail, data.replyAll),
+      const recipients = await this.withGmail(userId, message.mailAccountId, async (client, account) =>
+        computeRecipients(await fetchReplyHeaders(client, message.gmailMessageId), account.email, data.replyAll),
       ).catch(this.mapGmailNotFound);
       if (recipients.to.length === 0) throw new BadRequestError("There's no one to reply to on this email");
 
@@ -221,14 +221,14 @@ export class ReplyDraftService {
   private async withGmail<T>(
     userId: string,
     mailAccountId: string,
-    work: (client: gmail_v1.Gmail, accountEmail: string) => Promise<T>,
+    work: (client: gmail_v1.Gmail, account: { email: string; styleNote: string | null }) => Promise<T>,
   ): Promise<T> {
     const account = await this.mailAccountRepo.findById(mailAccountId, userId);
     if (!account) throw new NotFoundError("Mail account not found");
     if (account.status !== "ACTIVE") throw needsReauth();
 
     try {
-      return await work(await gmailFor(account), account.email);
+      return await work(await gmailFor(account), account);
     } catch (error) {
       if (!(error instanceof GmailAccessRevokedError)) throw error;
       await this.mailAccountService.markNeedsReauth(userId, account);
