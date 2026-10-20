@@ -7,15 +7,11 @@ const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
 const REQUEST_TIMEOUT_MS = 90_000;
 const DEFAULT_MAX_TOKENS = 4096;
 
-// OpenRouter free ids churn month to month; when every one 404s, suspect this list first.
 const GROQ_MODELS = ["openai/gpt-oss-120b", "openai/gpt-oss-20b"];
-const OPENROUTER_MODELS = [
-  "nvidia/nemotron-3-super-120b-a12b:free",
-  "google/gemma-4-31b-it:free",
-  "nvidia/nemotron-3.5-lightning:free",
-  "google/gemma-4-26b-a4b-it:free",
-  "openrouter/free",
-];
+// Every request carries a no-training, zero-retention policy, which the named free models
+// fail ("No endpoints found matching your data policy"); the free router can still pick a
+// provider that complies. A model added here must pass that policy, or it only adds a refusal.
+const OPENROUTER_MODELS = ["openrouter/free"];
 
 type Provider = "groq" | "openrouter";
 
@@ -90,6 +86,9 @@ const buildRequest = function (attempt: Attempt, options: CompletionOptions, ext
     if (extra.jsonMode) body.response_format = { type: "json_object" };
   } else {
     body.max_tokens = maxTokens;
+    // Mail is personal data under Google's Limited Use rules: only providers that
+    // neither train on prompts nor retain them may receive it, whatever the account settings say.
+    body.provider = { data_collection: "deny", zdr: true };
   }
 
   const headers: Record<string, string> = {
@@ -126,6 +125,11 @@ const extractJson = function (raw: string): string {
   return start >= 0 && end > start ? text.slice(start, end + 1) : text;
 };
 
+const failedResponse = async function (response: Response) {
+  const detail = await response.text().catch(() => "");
+  return new Error(`responded ${response.status}${detail ? `: ${detail.slice(0, 160)}` : ""}`);
+};
+
 const describe = function (error: unknown) {
   return error instanceof Error ? error.message : String(error);
 };
@@ -136,7 +140,7 @@ const isCallerAbort = function (options: CompletionOptions) {
 
 const attemptJson = async function <T>(attempt: Attempt, options: GenerateJsonOptions<T>): Promise<T> {
   const response = await fetch(attempt.url, buildRequest(attempt, options, { stream: false, jsonMode: true }));
-  if (!response.ok) throw new Error(`responded ${response.status}`);
+  if (!response.ok) throw await failedResponse(response);
 
   const data = (await response.json()) as { choices?: { message?: unknown }[] };
   const text = extractJson(messageText(data.choices?.[0]?.message));
@@ -171,7 +175,7 @@ class StreamInterruptedError extends Error {}
 
 const attemptStream = async function (attempt: Attempt, options: StreamTextOptions): Promise<string> {
   const response = await fetch(attempt.url, buildRequest(attempt, options, { stream: true, jsonMode: false }));
-  if (!response.ok || !response.body) throw new Error(`responded ${response.status}`);
+  if (!response.ok || !response.body) throw await failedResponse(response);
 
   const reader = response.body.getReader();
   const decoder = new TextDecoder();
