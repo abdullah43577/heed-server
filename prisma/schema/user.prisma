@@ -26,4 +26,5 @@ model User {
   emailMessages EmailMessage[]
   senderRules   SenderRule[]
   dailyReports  DailyReport[]
+  backlogRuns   BacklogRun[]
 }

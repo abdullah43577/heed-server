@@ -46,6 +46,24 @@ export const listAddedInboxMessageIds = async function (client: gmail_v1.Gmail, 
   return { ids: [...ids], historyId };
 };
 
+export const listUnreadInboxPage = async function (
+  client: gmail_v1.Gmail,
+  windowDays: number,
+  pageToken?: string,
+) {
+  const { data } = await client.users.messages.list({
+    userId: "me",
+    q: `in:inbox is:unread newer_than:${windowDays}d`,
+    maxResults: 500,
+    ...(pageToken && { pageToken }),
+  });
+
+  return {
+    ids: (data.messages ?? []).flatMap(message => (message.id ? [message.id] : [])),
+    nextPageToken: data.nextPageToken ?? null,
+  };
+};
+
 export const listInboxMessageIdsSince = async function (client: gmail_v1.Gmail, since: Date) {
   const ids: string[] = [];
   let pageToken: string | undefined;

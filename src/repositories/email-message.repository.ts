@@ -10,6 +10,7 @@ export interface CreateEmailMessageData {
   fromEmail: string;
   subject: string;
   receivedAt: Date;
+  backlogRunId?: string;
 }
 
 export interface TriageOutcome {
@@ -27,7 +28,7 @@ const messageInclude = {
 } satisfies Prisma.EmailMessageInclude;
 
 const viewFilter: Record<MessageView, Prisma.EmailMessageWhereInput> = {
-  handled: { category: { not: null }, action: { not: "AWAITING_REPLY" } },
+  handled: { category: { not: null }, action: { notIn: ["AWAITING_REPLY", "PENDING_CONFIRM"] } },
   review: { action: "AWAITING_REPLY" },
 };
 
@@ -45,19 +46,21 @@ export class EmailMessageRepository {
     });
   }
 
+  // Live mail only: a backlog run reports on its own.
   async findTriagedBetween(userId: string, start: Date, end: Date) {
     return prisma.emailMessage.findMany({
-      where: { userId, category: { not: null }, receivedAt: { gte: start, lt: end } },
+      where: { userId, backlogRunId: null, category: { not: null }, receivedAt: { gte: start, lt: end } },
       include: messageInclude,
       orderBy: { receivedAt: "desc" },
       take: 1000,
     });
   }
 
-  // Retention, across every user. A message still waiting on a reply keeps its row until it is dealt with.
-  async deleteReceivedBefore(before: Date) {
+  // Retention, across every user, by when Heed stored the row: a backlog run stores old mail today.
+  // A message still waiting on a reply keeps its row until it is dealt with.
+  async deleteCreatedBefore(before: Date) {
     return prisma.emailMessage.deleteMany({
-      where: { receivedAt: { lt: before }, OR: [{ action: null }, { action: { not: "AWAITING_REPLY" } }] },
+      where: { createdAt: { lt: before }, OR: [{ action: null }, { action: { not: "AWAITING_REPLY" } }] },
     });
   }
 
@@ -75,9 +78,63 @@ export class EmailMessageRepository {
 
   async findPendingTriage(mailAccountId: string, userId: string, take: number) {
     return prisma.emailMessage.findMany({
-      where: { mailAccountId, userId, category: null },
+      where: { mailAccountId, userId, category: null, backlogRunId: null },
       orderBy: { receivedAt: "asc" },
       take,
+    });
+  }
+
+  async findUnsortedForRun(backlogRunId: string, userId: string, take: number) {
+    return prisma.emailMessage.findMany({
+      where: { backlogRunId, userId, category: null },
+      orderBy: { receivedAt: "desc" },
+      take,
+    });
+  }
+
+  async findForRun(backlogRunId: string, userId: string, where: Prisma.EmailMessageWhereInput, take = 200) {
+    return prisma.emailMessage.findMany({
+      where: { backlogRunId, userId, ...where },
+      include: messageInclude,
+      orderBy: { receivedAt: "desc" },
+      take,
+    });
+  }
+
+  async countForRun(backlogRunId: string, userId: string) {
+    return prisma.emailMessage.groupBy({
+      by: ["category", "action"],
+      where: { backlogRunId, userId },
+      _count: { _all: true },
+    });
+  }
+
+  async findPendingConfirm(backlogRunId: string, userId: string) {
+    return prisma.emailMessage.findMany({
+      where: { backlogRunId, userId, action: "PENDING_CONFIRM" },
+      select: { id: true, gmailMessageId: true, fromEmail: true },
+    });
+  }
+
+  async setActionMany(ids: string[], userId: string, action: EmailAction) {
+    return prisma.emailMessage.updateMany({ where: { id: { in: ids }, userId }, data: { action } });
+  }
+
+  async markUnsortedUnsure(backlogRunId: string, userId: string, reason: string) {
+    return prisma.emailMessage.updateMany({
+      where: { backlogRunId, userId, category: null },
+      data: { category: "UNSURE", action: "LEFT_UNREAD", decidedBy: "FALLBACK", reason, triagedAt: new Date() },
+    });
+  }
+
+  // Cancelling forgets what the run found, except a row the user already acted on.
+  async deleteUnresolvedForRun(backlogRunId: string, userId: string) {
+    return prisma.emailMessage.deleteMany({
+      where: {
+        backlogRunId,
+        userId,
+        OR: [{ action: null }, { action: { in: ["PENDING_CONFIRM", "LEFT_UNREAD"] } }],
+      },
     });
   }
 
@@ -95,6 +152,13 @@ export class EmailMessageRepository {
   async incrementTriageAttempts(id: string, userId: string) {
     return prisma.emailMessage.update({
       where: { id, userId },
+      data: { triageAttempts: { increment: 1 } },
+    });
+  }
+
+  async incrementTriageAttemptsMany(ids: string[], userId: string) {
+    return prisma.emailMessage.updateMany({
+      where: { id: { in: ids }, userId },
       data: { triageAttempts: { increment: 1 } },
     });
   }

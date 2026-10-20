@@ -55,7 +55,7 @@ export class DailyReportService {
   }
 
   async applyRetention(now = new Date()) {
-    const messages = await this.emailMessageRepo.deleteReceivedBefore(new Date(now.getTime() - MESSAGE_RETENTION_MS));
+    const messages = await this.emailMessageRepo.deleteCreatedBefore(new Date(now.getTime() - MESSAGE_RETENTION_MS));
     const reports = await this.dailyReportRepo.deleteCreatedBefore(new Date(now.getTime() - REPORT_RETENTION_MS));
     return { messages: messages.count, reports: reports.count };
   }

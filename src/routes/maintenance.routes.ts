@@ -8,5 +8,6 @@ const maintenanceController = new MaintenanceController();
 router.post("/sync", maintenanceController.runMailSync.bind(maintenanceController));
 router.post("/reports", maintenanceController.runReportSweep.bind(maintenanceController));
 router.post("/retention", maintenanceController.runRetention.bind(maintenanceController));
+router.post("/backlog", maintenanceController.runBacklogStep.bind(maintenanceController));
 
 export { router as maintenanceRouter };

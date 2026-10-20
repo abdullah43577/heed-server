@@ -47,7 +47,10 @@ export class EmailMessageService {
   async dismissReply(id: string, userId: string) {
     try {
       const message = await this.getMessage(id, userId);
-      if (message.action !== "AWAITING_REPLY") throw new BadRequestError("This one isn't waiting on a reply");
+      // A backlog email that might need a reply is left unread rather than awaiting one.
+      const waiting =
+        message.action === "AWAITING_REPLY" || (message.category === "NEEDS_REPLY" && message.action === "LEFT_UNREAD");
+      if (!waiting) throw new BadRequestError("This one isn't waiting on a reply");
 
       await this.changeLabels(userId, message.mailAccountId, message.gmailMessageId, account => ({
         add: account.handledLabelId ? [account.handledLabelId] : [],

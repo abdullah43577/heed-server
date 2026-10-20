@@ -12,6 +12,7 @@ enum EmailAction {
   LEFT_UNREAD
   AWAITING_REPLY
   UNDONE
+  PENDING_CONFIRM
 }
 
 enum TriageSource {
@@ -44,9 +45,14 @@ model EmailMessage {
   triageAttempts Int           @default(0)
   triagedAt      DateTime?
 
+  // Set when a backlog run found it; live triage leaves these rows alone.
+  backlogRunId String?
+  backlogRun   BacklogRun? @relation(fields: [backlogRunId], references: [id], onDelete: SetNull)
+
   createdAt DateTime @default(now())
 
   @@unique([mailAccountId, gmailMessageId])
   @@index([userId, receivedAt])
   @@index([mailAccountId, category])
+  @@index([backlogRunId, category])
 }

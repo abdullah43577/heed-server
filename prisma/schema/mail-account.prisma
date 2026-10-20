@@ -19,7 +19,8 @@ model MailAccount {
   historyId    String?
   lastSyncedAt DateTime?
 
-  messages EmailMessage[]
+  messages    EmailMessage[]
+  backlogRuns BacklogRun[]
 
   connectedAt DateTime @default(now())
   updatedAt   DateTime @updatedAt

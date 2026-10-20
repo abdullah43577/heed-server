@@ -1,6 +1,7 @@
 import type { Application, NextFunction, Request, Response } from "express";
 import { handleErrors } from "../lib/handle-errors";
 import { authRouter } from "./auth.routes";
+import { backlogRunRouter } from "./backlog-run.routes";
 import { dailyReportRouter } from "./daily-report.routes";
 import { emailMessageRouter } from "./email-message.routes";
 import { mailAccountRouter } from "./mail-account.routes";
@@ -15,6 +16,7 @@ export const registerRoutes = (app: Application) => {
   app.use("/v1/messages", emailMessageRouter);
   app.use("/v1/rules", senderRuleRouter);
   app.use("/v1/reports", dailyReportRouter);
+  app.use("/v1/backlog", backlogRunRouter);
   app.use("/v1/maintenance", maintenanceRouter);
 
   app.use((req: Request, res: Response) => {

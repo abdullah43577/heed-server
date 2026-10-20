@@ -58,6 +58,54 @@ export const modifyLabels = async function (
   });
 };
 
+const BATCH_MODIFY_LIMIT = 1000;
+
+export const batchModifyLabels = async function (
+  client: gmail_v1.Gmail,
+  ids: string[],
+  change: { add?: string[]; remove?: string[] },
+) {
+  for (let index = 0; index < ids.length; index += BATCH_MODIFY_LIMIT) {
+    await client.users.messages.batchModify({
+      userId: "me",
+      requestBody: {
+        ids: ids.slice(index, index + BATCH_MODIFY_LIMIT),
+        addLabelIds: change.add ?? [],
+        removeLabelIds: change.remove ?? [],
+      },
+    });
+  }
+};
+
+export interface MessagePreview {
+  labels: string[];
+  to: string;
+  date: string;
+  listUnsubscribe: string;
+  precedence: string;
+  snippet: string;
+}
+
+// The backlog's lighter read: headers and Gmail's own snippet, never the body.
+export const fetchMessagePreview = async function (client: gmail_v1.Gmail, id: string): Promise<MessagePreview> {
+  const { data } = await client.users.messages.get({
+    userId: "me",
+    id,
+    format: "metadata",
+    metadataHeaders: ["To", "Date", "List-Unsubscribe", "Precedence"],
+  });
+  const headers = data.payload?.headers ?? [];
+
+  return {
+    labels: data.labelIds ?? [],
+    to: header(headers, "To"),
+    date: header(headers, "Date"),
+    listUnsubscribe: header(headers, "List-Unsubscribe"),
+    precedence: header(headers, "Precedence"),
+    snippet: (data.snippet ?? "").slice(0, 300),
+  };
+};
+
 // Null for anything Heed should not treat as new mail: outgoing, drafts, spam,
 // or already read by the time Heed looked.
 export const fetchIncomingMessage = async function (

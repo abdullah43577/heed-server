@@ -1,0 +1,41 @@
+enum BacklogRunStatus {
+  SCANNING
+  SORTING
+  READY
+  APPLYING
+  DONE
+  CANCELLED
+  FAILED
+}
+
+model BacklogRun {
+  id            String      @id @default(cuid())
+  userId        String
+  user          User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  mailAccountId String
+  mailAccount   MailAccount @relation(fields: [mailAccountId], references: [id], onDelete: Cascade)
+
+  windowDays Int
+  status     BacklogRunStatus @default(SCANNING)
+
+  // Gmail's list cursor between scan steps; null once the scan has finished.
+  pageToken String?
+  total     Int     @default(0)
+  sorted    Int     @default(0)
+  aiCalls   Int     @default(0)
+  truncated Boolean @default(false)
+
+  // Snapshots: what the summary offered when it became ready, and what applying marked read.
+  counts     Json?
+  markedRead Int?
+
+  messages EmailMessage[]
+
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+  readyAt    DateTime?
+  finishedAt DateTime?
+
+  @@index([mailAccountId, status])
+  @@index([userId, createdAt])
+}

@@ -3,6 +3,7 @@ import { type Request, type Response } from "express";
 import { UnauthorizedError } from "../lib/errors";
 import { getEnv } from "../lib/get-env";
 import { handleErrors } from "../lib/handle-errors";
+import { BacklogWorkerService } from "../services/backlog-worker.service";
 import { DailyReportService } from "../services/daily-report.service";
 import { MailSyncService } from "../services/mail-sync.service";
 
@@ -29,6 +30,18 @@ const assertCronSecret = function (req: Request) {
 export class MaintenanceController {
   private mailSyncService = new MailSyncService();
   private dailyReportService = new DailyReportService();
+  private backlogWorker = new BacklogWorkerService();
+
+  async runBacklogStep(req: Request, res: Response) {
+    try {
+      assertCronSecret(req);
+
+      const result = await this.backlogWorker.advance();
+      res.status(200).json({ message: "Backlog step finished", data: result });
+    } catch (error) {
+      handleErrors({ res, error });
+    }
+  }
 
   // For hosts that sleep when idle: the call wakes the server and starts one sync pass.
   // It answers before the pass ends, because triage can outlast a cron service's timeout.
