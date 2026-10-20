@@ -187,6 +187,10 @@ export class EmailMessageRepository {
     });
   }
 
+  async setDraftAttempts(id: string, userId: string, draftAttempts: number) {
+    return prisma.emailMessage.update({ where: { id, userId }, data: { draftAttempts } });
+  }
+
   async incrementDraftAttempts(id: string, userId: string) {
     return prisma.emailMessage.update({ where: { id, userId }, data: { draftAttempts: { increment: 1 } } });
   }

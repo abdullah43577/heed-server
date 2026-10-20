@@ -9,6 +9,8 @@ import { fetchReplyHeaders } from "../lib/gmail/thread";
 import { EmailMessageRepository } from "../repositories/email-message.repository";
 import { MailAccountRepository } from "../repositories/mail-account.repository";
 import { ReplyDraftRepository } from "../repositories/reply-draft.repository";
+import { SenderRuleRepository } from "../repositories/sender-rule.repository";
+import { resolveSenderRules } from "../lib/triage/rules";
 import { DraftingService } from "./drafting.service";
 import { MailAccountService } from "./mail-account.service";
 import { NotificationService } from "./notification.service";
@@ -35,6 +37,7 @@ export class ReplyWorkerService {
   private mailAccountService = new MailAccountService();
   private notificationService = new NotificationService();
   private drafting = new DraftingService();
+  private senderRuleRepo = new SenderRuleRepository();
 
   async draftTick(now = new Date()) {
     const recovered = await this.recoverStuckSends(now);
@@ -55,6 +58,13 @@ export class ReplyWorkerService {
     for (const message of candidates) {
       const account = await this.mailAccountRepo.findById(message.mailAccountId, message.userId);
       if (!account || account.status !== "ACTIVE") continue;
+
+      // "Never draft": settle it as out of attempts so it stops being a candidate. A tap still drafts it.
+      const rules = await this.senderRuleRepo.findManyByUser(message.userId);
+      if (resolveSenderRules(rules, message.fromEmail, account.id).neverDraft) {
+        await this.emailMessageRepo.setDraftAttempts(message.id, message.userId, AUTO_DRAFT_MAX_ATTEMPTS);
+        continue;
+      }
 
       try {
         // Quota is not an error: the email waits in Review with a Draft a reply button.

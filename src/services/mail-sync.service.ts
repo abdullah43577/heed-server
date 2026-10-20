@@ -29,6 +29,7 @@ interface SyncableAccount {
   lastSyncedAt: Date | null;
   handledLabelId: string | null;
   replyLabelId: string | null;
+  instruction: string | null;
 }
 
 export class MailSyncService {

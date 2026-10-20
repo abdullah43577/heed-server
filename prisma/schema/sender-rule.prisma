@@ -1,5 +1,7 @@
 enum SenderRuleKind {
   ALWAYS_LEAVE
+  ALWAYS_HANDLE
+  NEVER_DRAFT
 }
 
 model SenderRule {
@@ -7,11 +9,16 @@ model SenderRule {
   userId String
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
+  // Null applies the rule to every account the user connects.
+  mailAccountId String?
+  mailAccount   MailAccount? @relation(fields: [mailAccountId], references: [id], onDelete: Cascade)
+
   // A lowercased address, or "@domain" for a whole domain.
   pattern String
   kind    SenderRuleKind
 
   createdAt DateTime @default(now())
 
-  @@unique([userId, pattern])
+  // Uniqueness per (pattern, kind, scope) is kept by SenderRuleService: Postgres treats null scopes as distinct.
+  @@index([userId, pattern])
 }

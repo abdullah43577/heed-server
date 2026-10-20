@@ -22,9 +22,12 @@ model MailAccount {
   // How the user writes from this address, learned from Sent and editable; every draft follows it.
   styleNote      String?
   styleLearnedAt DateTime?
+  // What the user tells Heed about this inbox ("I'm a freelance designer; recruiters get a polite no").
+  instruction    String?
 
   messages    EmailMessage[]
   backlogRuns BacklogRun[]
+  senderRules SenderRule[]
 
   connectedAt DateTime @default(now())
   updatedAt   DateTime @updatedAt

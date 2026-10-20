@@ -3,7 +3,7 @@ import { AppError, ConflictError, NotFoundError } from "../lib/errors";
 import { gmailFor, GmailAccessRevokedError } from "../lib/gmail/client";
 import { ensureHeedLabels } from "../lib/gmail/labels";
 import { batchModifyLabels } from "../lib/gmail/message";
-import { matchesSenderPattern } from "../lib/triage/rules";
+import { resolveSenderRules } from "../lib/triage/rules";
 import { BacklogRunRepository } from "../repositories/backlog-run.repository";
 import { EmailMessageRepository } from "../repositories/email-message.repository";
 import { MailAccountRepository } from "../repositories/mail-account.repository";
@@ -88,8 +88,7 @@ export class BacklogService {
         // A "leave it" rule made after sorting still wins.
         const rules = await this.senderRuleRepo.findManyByUser(userId);
         const pending = await this.emailMessageRepo.findPendingConfirm(id, userId);
-        const isLeft = (fromEmail: string) =>
-          rules.some(rule => rule.kind === "ALWAYS_LEAVE" && matchesSenderPattern(rule.pattern, fromEmail));
+        const isLeft = (fromEmail: string) => resolveSenderRules(rules, fromEmail, run.mailAccountId).read === "LEAVE";
 
         const left = pending.filter(message => isLeft(message.fromEmail));
         const toRead = pending.filter(message => !isLeft(message.fromEmail));

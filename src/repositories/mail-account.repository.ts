@@ -8,6 +8,7 @@ const publicSelect = {
   connectedAt: true,
   styleNote: true,
   styleLearnedAt: true,
+  instruction: true,
 } as const;
 
 export interface UpsertMailAccountData {
@@ -37,6 +38,7 @@ export class MailAccountRepository {
         refreshTokenEnc: true,
         historyId: true,
         lastSyncedAt: true,
+        instruction: true,
         handledLabelId: true,
         replyLabelId: true,
       },
@@ -71,7 +73,11 @@ export class MailAccountRepository {
     return prisma.mailAccount.update({ where: { id, userId }, data: cursor });
   }
 
-  async updateStyleNote(id: string, userId: string, data: { styleNote: string | null; styleLearnedAt?: Date | null }) {
+  async updateSettings(
+    id: string,
+    userId: string,
+    data: { styleNote?: string | null; styleLearnedAt?: Date | null; instruction?: string | null },
+  ) {
     return prisma.mailAccount.update({ where: { id, userId }, data, select: publicSelect });
   }
 

@@ -33,10 +33,10 @@ export class MailAccountController {
     try {
       const { userId } = req;
       const { id } = req.params;
-      const { styleNote } = updateMailAccountSchema.parse(req.body);
+      const data = updateMailAccountSchema.parse(req.body);
 
-      const account = await this.writingStyleService.update(id as string, userId!, styleNote);
-      res.status(200).json({ message: "Writing style saved", data: account });
+      const account = await this.writingStyleService.update(id as string, userId!, data);
+      res.status(200).json({ message: "Saved", data: account });
     } catch (error) {
       handleErrors({ res, error });
     }

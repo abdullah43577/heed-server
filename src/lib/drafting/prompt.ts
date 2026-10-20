@@ -23,7 +23,19 @@ export interface DraftAuthorPrompt {
   name: string | null;
   email: string;
   styleNote?: string | null;
+  instruction?: string | null;
 }
+
+const MAX_INSTRUCTION_CHARS = 500;
+
+// The user's standing instructions are theirs to give ("recruiters get a polite no"), so they are
+// followed, but below the rules: they can steer a reply, not license inventing or committing.
+const instructionSection = (instruction: string) => `
+
+Their standing instructions for replies from this inbox, in their own words. Follow them unless they conflict with a rule above:
+"""
+${instruction.slice(0, MAX_INSTRUCTION_CHARS)}
+"""`;
 
 // The style note shapes voice only. It comes after the rules and is told it cannot override them,
 // because it was learned from mail and the user can type anything into it.
@@ -55,6 +67,7 @@ export const styleForPrompt = function (styleNote: string | null | undefined) {
 export const draftSystemPrompt = function (author: DraftAuthorPrompt) {
   const who = author.name ? `${author.name} (${author.email})` : author.email;
   const styleNote = styleForPrompt(author.styleNote);
+  const instruction = author.instruction?.trim();
   const shape = styleNote
     ? "- Open, close and size the reply the way their style note below says, with the sign-off on its own line after a blank line."
     : "- Short and natural, the way a busy person replies. Start with a short greeting using their first name, then the reply, with the sign-off on its own line after a blank line.";
@@ -73,7 +86,7 @@ ${shape}
 - Write in the language of their message${styleNote ? " unless the style note says otherwise" : ""}.
 - Never invent facts. Do not state dates, times, prices, amounts, numbers, links, addresses, attachments, commitments or availability unless they appear in the thread.
 - Where the reply needs something only ${author.name ?? "the sender"} knows, write a short placeholder in square brackets describing it, for example [your availability next week] or [the price you want to quote]. Put each one inside a natural sentence ("I'm free on [your availability next week]. Does that work?"), never on a line by itself. Use as many as the reply needs, and never guess instead.
-- Never say you have attached something. Never agree to anything the thread does not show they already agreed to.${signOff}${styleNote ? styleSection(styleNote) : ""}
+- Never say you have attached something. Never agree to anything the thread does not show they already agreed to.${signOff}${instruction ? instructionSection(instruction) : ""}${styleNote ? styleSection(styleNote) : ""}
 
 Respond with JSON only: {"body": "..."}`;
 };

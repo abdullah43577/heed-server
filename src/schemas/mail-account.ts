@@ -15,12 +15,23 @@ export const oauthCallbackQuerySchema = z.object({
   error: z.string().optional(),
 });
 
-// null, or an empty note, clears it: drafts go back to the default voice.
-export const updateMailAccountSchema = z.object({
-  styleNote: z
+const MAX_INSTRUCTION_CHARS = 500;
+
+// Either field can be sent alone; null, or empty text, clears it.
+const clearable = (max: number, message: string) =>
+  z
     .string()
     .trim()
-    .max(MAX_STYLE_NOTE_CHARS, "Keep the style note short")
+    .max(max, message)
     .transform(value => value || null)
-    .nullable(),
-});
+    .nullable()
+    .optional();
+
+export const updateMailAccountSchema = z
+  .object({
+    styleNote: clearable(MAX_STYLE_NOTE_CHARS, "Keep the style note short"),
+    instruction: clearable(MAX_INSTRUCTION_CHARS, "Keep the instruction under 500 characters"),
+  })
+  .refine(data => data.styleNote !== undefined || data.instruction !== undefined, "Nothing to update");
+
+export type UpdateMailAccount = z.infer<typeof updateMailAccountSchema>;

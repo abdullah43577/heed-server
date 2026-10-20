@@ -5,6 +5,7 @@ import { AppError, NotFoundError } from "../lib/errors";
 import { gmailFor, GmailAccessRevokedError } from "../lib/gmail/client";
 import { fetchRecentSentBodies } from "../lib/gmail/sent";
 import { MailAccountRepository } from "../repositories/mail-account.repository";
+import type { UpdateMailAccount } from "../schemas/mail-account";
 import { MailAccountService } from "./mail-account.service";
 
 const SENT_SAMPLE = 50;
@@ -50,7 +51,7 @@ export class WritingStyleService {
         reasoningEffort: "medium",
       });
 
-      return await this.mailAccountRepo.updateStyleNote(mailAccountId, userId, {
+      return await this.mailAccountRepo.updateSettings(mailAccountId, userId, {
         styleNote: result.styleNote,
         styleLearnedAt: new Date(),
       });
@@ -59,14 +60,16 @@ export class WritingStyleService {
     }
   }
 
-  async update(mailAccountId: string, userId: string, styleNote: string | null) {
+  // The account's drafting settings: the style note and the instruction, either or both.
+  async update(mailAccountId: string, userId: string, data: UpdateMailAccount) {
     try {
       const account = await this.mailAccountRepo.findById(mailAccountId, userId);
       if (!account) throw new NotFoundError("Mail account not found");
 
-      return await this.mailAccountRepo.updateStyleNote(mailAccountId, userId, {
-        styleNote,
-        ...(styleNote === null && { styleLearnedAt: null }),
+      return await this.mailAccountRepo.updateSettings(mailAccountId, userId, {
+        ...(data.styleNote !== undefined && { styleNote: data.styleNote }),
+        ...(data.styleNote === null && { styleLearnedAt: null }),
+        ...(data.instruction !== undefined && { instruction: data.instruction }),
       });
     } catch (error) {
       throw error;

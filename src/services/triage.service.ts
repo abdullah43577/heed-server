@@ -7,7 +7,7 @@ import { isGmailNotFound } from "../lib/gmail/client";
 import { ensureHeedLabels } from "../lib/gmail/labels";
 import { fetchFullMessage, modifyLabels, type FullMessage } from "../lib/gmail/message";
 import { buildTriagePrompt, TRIAGE_SYSTEM_PROMPT, triageResultSchema } from "../lib/triage/prompt";
-import { headerCategory, isAddressedDirectly, isBulkSender, matchesSenderPattern } from "../lib/triage/rules";
+import { headerCategory, isAddressedDirectly, isBulkSender, resolveSenderRules, type ResolvedRules } from "../lib/triage/rules";
 import { EmailMessageRepository, type TriageOutcome } from "../repositories/email-message.repository";
 import { MailAccountRepository } from "../repositories/mail-account.repository";
 import { SenderRuleRepository } from "../repositories/sender-rule.repository";
@@ -22,6 +22,7 @@ export interface TriageAccount {
   email: string;
   handledLabelId: string | null;
   replyLabelId: string | null;
+  instruction: string | null;
 }
 
 interface HeedLabels {
@@ -72,15 +73,13 @@ export class TriageService {
     message: EmailMessage,
   ) {
     const full = await fetchFullMessage(client, message.gmailMessageId);
-    const decision = await this.decide(account, message, full);
+    const resolved = resolveSenderRules(rules, message.fromEmail, account.id);
+    const decision = await this.decide(account, message, full, resolved);
     if (!decision) return false;
 
-    const alwaysLeave = rules.some(
-      rule => rule.kind === "ALWAYS_LEAVE" && matchesSenderPattern(rule.pattern, message.fromEmail),
-    );
     const action = await this.apply(client, labels, message, decision, {
       stillUnread: full.labels.includes("UNREAD"),
-      alwaysLeave,
+      alwaysLeave: resolved.read === "LEAVE",
     });
 
     await this.emailMessageRepo.applyTriage(message.id, account.userId, { ...decision, action });
@@ -88,7 +87,22 @@ export class TriageService {
   }
 
   // Null means "try again on the next pass": the AI was unreachable and attempts remain.
-  private async decide(account: TriageAccount, message: EmailMessage, full: FullMessage): Promise<Decision | null> {
+  private async decide(
+    account: TriageAccount,
+    message: EmailMessage,
+    full: FullMessage,
+    resolved: ResolvedRules,
+  ): Promise<Decision | null> {
+    // Rules come before any AI call: "always handle" reads the sender without spending a model call.
+    if (resolved.read === "HANDLE") {
+      return {
+        category: headerCategory(full) ?? "ROUTINE",
+        decidedBy: "RULE",
+        summary: null,
+        reason: "Your rule: always handle this sender",
+      };
+    }
+
     const fromHeaders = headerCategory(full);
     if (fromHeaders) {
       return { category: fromHeaders, decidedBy: "HEADER", summary: null, reason: "Gmail filed it under Promotions" };
@@ -110,6 +124,7 @@ export class TriageService {
           subject: message.subject,
           date: full.date,
           bodyText: full.bodyText,
+          instruction: account.instruction,
         }),
         schema: triageResultSchema,
         temperature: 0,

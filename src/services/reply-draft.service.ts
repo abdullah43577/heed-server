@@ -221,7 +221,10 @@ export class ReplyDraftService {
   private async withGmail<T>(
     userId: string,
     mailAccountId: string,
-    work: (client: gmail_v1.Gmail, account: { email: string; styleNote: string | null }) => Promise<T>,
+    work: (
+      client: gmail_v1.Gmail,
+      account: { email: string; styleNote: string | null; instruction: string | null },
+    ) => Promise<T>,
   ): Promise<T> {
     const account = await this.mailAccountRepo.findById(mailAccountId, userId);
     if (!account) throw new NotFoundError("Mail account not found");

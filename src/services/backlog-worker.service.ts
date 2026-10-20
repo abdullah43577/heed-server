@@ -13,7 +13,7 @@ import {
   buildBatchPrompt,
   type BatchItem,
 } from "../lib/triage/batch-prompt";
-import { backlogHeaderCategory, isAddressedDirectly, isBulkSender, matchesSenderPattern } from "../lib/triage/rules";
+import { backlogHeaderCategory, isAddressedDirectly, isBulkSender, resolveSenderRules } from "../lib/triage/rules";
 import { BacklogRunRepository } from "../repositories/backlog-run.repository";
 import { EmailMessageRepository, type TriageOutcome } from "../repositories/email-message.repository";
 import { SenderRuleRepository } from "../repositories/sender-rule.repository";
@@ -192,8 +192,18 @@ export class BacklogWorkerService {
       }
     }
 
-    const byHeader = ready.filter(({ preview }) => backlogHeaderCategory(preview));
-    const forAi = ready.filter(({ preview }) => !backlogHeaderCategory(preview));
+    const handledByRule = ({ message }: { message: EmailMessage }) =>
+      resolveSenderRules(rules, message.fromEmail, run.mailAccountId).read === "HANDLE";
+    const byRule = ready.filter(handledByRule);
+    const byHeader = ready.filter(item => !handledByRule(item) && backlogHeaderCategory(item.preview));
+    const forAi = ready.filter(item => !handledByRule(item) && !backlogHeaderCategory(item.preview));
+
+    for (const { message, preview } of byRule) {
+      const category = backlogHeaderCategory(preview) ?? "ROUTINE";
+      const reason = "Your rule: always handle this sender";
+      await this.record(message, preview, rules, run.userId, { category, decidedBy: "RULE", summary: null, reason });
+      settled += 1;
+    }
 
     for (const { message, preview } of byHeader) {
       const category = backlogHeaderCategory(preview)!;
@@ -288,9 +298,7 @@ export class BacklogWorkerService {
     userId: string,
     decision: Decision,
   ) {
-    const alwaysLeave = rules.some(
-      rule => rule.kind === "ALWAYS_LEAVE" && matchesSenderPattern(rule.pattern, message.fromEmail),
-    );
+    const alwaysLeave = resolveSenderRules(rules, message.fromEmail, message.mailAccountId).read === "LEAVE";
     const stillUnread = preview.labels.includes("UNREAD");
     const action = HANDLED.includes(decision.category) && stillUnread && !alwaysLeave ? "PENDING_CONFIRM" : "LEFT_UNREAD";
 

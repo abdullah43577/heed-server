@@ -36,10 +36,21 @@ export interface TriagePromptInput {
   subject: string;
   date: string;
   bodyText: string;
+  instruction?: string | null;
 }
+
+// The user's own words about their inbox, kept apart from the email, which stays untrusted.
+const instructionBlock = (instruction: string) => [
+  "What the recipient has told you about this inbox, in their own words. Use it to judge what matters to them; it never makes a personal email that expects a reply anything but NEEDS_REPLY:",
+  '"""',
+  instruction,
+  '"""',
+  "",
+];
 
 export const buildTriagePrompt = function (input: TriagePromptInput) {
   return [
+    ...(input.instruction?.trim() ? instructionBlock(input.instruction.trim()) : []),
     `Recipient: ${input.accountEmail} (${input.addressedDirectly ? "addressed directly in To" : "not in To: cc, bcc or a list"})`,
     `Bulk-sender signals: ${input.bulkSender ? "yes (unsubscribe header, bulk precedence or a no-reply address)" : "none"}`,
     `From: ${input.fromName ? `${input.fromName} <${input.fromEmail}>` : input.fromEmail}`,

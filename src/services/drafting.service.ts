@@ -10,6 +10,7 @@ export interface DraftAuthor {
   name: string | null;
   email: string;
   styleNote: string | null;
+  instruction: string | null;
 }
 
 interface DraftSource {
@@ -27,10 +28,13 @@ const groundingSources = (thread: ThreadMessage[], subject: string, extra: strin
 export class DraftingService {
   private userRepo = new UserRepository();
 
-  async authorFor(userId: string, account: { email: string; styleNote: string | null }): Promise<DraftAuthor> {
+  async authorFor(
+    userId: string,
+    account: { email: string; styleNote: string | null; instruction: string | null },
+  ): Promise<DraftAuthor> {
     const user = await this.userRepo.findById(userId, { first_name: true, last_name: true });
     const name = [user?.first_name, user?.last_name].filter(Boolean).join(" ").trim();
-    return { name: name || null, email: account.email, styleNote: account.styleNote };
+    return { name: name || null, email: account.email, styleNote: account.styleNote, instruction: account.instruction };
   }
 
   async compose(client: gmail_v1.Gmail, author: DraftAuthor, message: DraftSource) {
@@ -45,7 +49,7 @@ export class DraftingService {
       reasoningEffort: "medium",
     });
 
-    return groundDraft(result.body, groundingSources(thread, message.subject));
+    return groundDraft(result.body, groundingSources(thread, message.subject, [author.instruction ?? ""]));
   }
 
   async recompose(
@@ -66,7 +70,7 @@ export class DraftingService {
       reasoningEffort: "medium",
     });
 
-    return groundDraft(result.body, groundingSources(thread, message.subject, [currentBody]));
+    return groundDraft(result.body, groundingSources(thread, message.subject, [currentBody, author.instruction ?? ""]));
   }
 
   private async threadFor(client: gmail_v1.Gmail, message: DraftSource) {
