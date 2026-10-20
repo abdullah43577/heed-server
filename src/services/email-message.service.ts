@@ -3,12 +3,14 @@ import { gmailFor, GmailAccessRevokedError } from "../lib/gmail/client";
 import { modifyLabels } from "../lib/gmail/message";
 import { EmailMessageRepository, type MessageView } from "../repositories/email-message.repository";
 import { MailAccountRepository } from "../repositories/mail-account.repository";
+import { ReplyDraftRepository } from "../repositories/reply-draft.repository";
 import { MailAccountService } from "./mail-account.service";
 
 export class EmailMessageService {
   private emailMessageRepo = new EmailMessageRepository();
   private mailAccountRepo = new MailAccountRepository();
   private mailAccountService = new MailAccountService();
+  private draftRepo = new ReplyDraftRepository();
 
   async getMessages(userId: string, options: { view: MessageView; since?: Date }) {
     try {
@@ -57,6 +59,7 @@ export class EmailMessageService {
         remove: ["UNREAD", ...(account.replyLabelId ? [account.replyLabelId] : [])],
       }));
 
+      await this.draftRepo.dismissForMessage(id, userId);
       return await this.emailMessageRepo.update(id, userId, {
         category: "ROUTINE",
         action: "MARKED_READ",

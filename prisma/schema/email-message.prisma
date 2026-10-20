@@ -13,6 +13,7 @@ enum EmailAction {
   AWAITING_REPLY
   UNDONE
   PENDING_CONFIRM
+  REPLIED
 }
 
 enum TriageSource {
@@ -48,6 +49,10 @@ model EmailMessage {
   // Set when a backlog run found it; live triage leaves these rows alone.
   backlogRunId String?
   backlogRun   BacklogRun? @relation(fields: [backlogRunId], references: [id], onDelete: SetNull)
+
+  draft         ReplyDraft?
+  // Automatic drafting gives up after three failures; drafting on demand ignores this.
+  draftAttempts Int         @default(0)
 
   createdAt DateTime @default(now())
 

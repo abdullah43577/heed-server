@@ -1,0 +1,34 @@
+enum DraftStatus {
+  PENDING
+  SCHEDULED
+  SENDING
+  SENT
+  DISMISSED
+  REPLIED_ELSEWHERE
+  FAILED
+}
+
+model ReplyDraft {
+  id             String       @id @default(cuid())
+  userId         String
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  emailMessageId String       @unique
+  emailMessage   EmailMessage @relation(fields: [emailMessageId], references: [id], onDelete: Cascade)
+
+  body     String
+  replyAll Boolean     @default(false)
+  status   DraftStatus @default(PENDING)
+
+  // Set while SCHEDULED: the end of the undo window, when the sender may take it.
+  sendAt        DateTime?
+  sentMessageId String?
+  failureReason String?
+  // Null until the batched "replies ready" push has covered it.
+  notifiedAt    DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId, status])
+  @@index([status, sendAt])
+}

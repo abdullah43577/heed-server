@@ -1,5 +1,6 @@
 import type { EmailAction, EmailCategory, Prisma, TriageSource } from "../generated/prisma/client";
 import { prisma } from "../lib/prisma";
+import { OPEN_DRAFT_STATUSES } from "./reply-draft.repository";
 
 export interface CreateEmailMessageData {
   userId: string;
@@ -25,11 +26,25 @@ export type MessageView = "handled" | "review";
 
 const messageInclude = {
   mailAccount: { select: { id: true, email: true } },
+  draft: { select: { id: true, status: true, body: true, replyAll: true, sendAt: true, updatedAt: true } },
 } satisfies Prisma.EmailMessageInclude;
 
+const hasOpenDraft: Prisma.EmailMessageWhereInput = { draft: { is: { status: { in: OPEN_DRAFT_STATUSES } } } };
+
+// A message with an open draft is in Review whatever it was triaged as: drafting on demand puts it there.
 const viewFilter: Record<MessageView, Prisma.EmailMessageWhereInput> = {
-  handled: { category: { not: null }, action: { notIn: ["AWAITING_REPLY", "PENDING_CONFIRM"] } },
-  review: { action: "AWAITING_REPLY" },
+  handled: {
+    category: { not: null },
+    action: { notIn: ["AWAITING_REPLY", "PENDING_CONFIRM"] },
+    NOT: [hasOpenDraft],
+  },
+  review: { OR: [{ action: "AWAITING_REPLY" }, hasOpenDraft] },
+};
+
+// "Waiting on a reply": flagged by live triage, or a backlog email that might need one.
+export const WAITING_ON_REPLY: Prisma.EmailMessageWhereInput = {
+  category: "NEEDS_REPLY",
+  OR: [{ action: "AWAITING_REPLY" }, { action: "LEFT_UNREAD", backlogRunId: { not: null } }],
 };
 
 export class EmailMessageRepository {
@@ -153,6 +168,33 @@ export class EmailMessageRepository {
     return prisma.emailMessage.update({
       where: { id, userId },
       data: { triageAttempts: { increment: 1 } },
+    });
+  }
+
+  // The auto-drafter's entry point, and a cross-user read: every call after it carries the row's userId.
+  // Only recent mail: a machine reply to an old email is usually stale.
+  async findDraftCandidates(since: Date, maxAttempts: number, take: number) {
+    return prisma.emailMessage.findMany({
+      where: {
+        ...WAITING_ON_REPLY,
+        draft: { is: null },
+        draftAttempts: { lt: maxAttempts },
+        receivedAt: { gte: since },
+        mailAccount: { status: "ACTIVE" },
+      },
+      orderBy: { receivedAt: "asc" },
+      take,
+    });
+  }
+
+  async incrementDraftAttempts(id: string, userId: string) {
+    return prisma.emailMessage.update({ where: { id, userId }, data: { draftAttempts: { increment: 1 } } });
+  }
+
+  async findWaitingInThreads(mailAccountId: string, userId: string, threadIds: string[]) {
+    return prisma.emailMessage.findMany({
+      where: { mailAccountId, userId, gmailThreadId: { in: threadIds }, ...WAITING_ON_REPLY },
+      select: { id: true, gmailMessageId: true },
     });
   }
 

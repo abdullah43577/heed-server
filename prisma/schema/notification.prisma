@@ -3,6 +3,7 @@ enum NotificationType {
   ACCOUNT_NEEDS_REAUTH
   DAILY_REPORT
   BACKLOG_READY
+  DRAFTS_READY
 }
 
 model Notification {

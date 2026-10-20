@@ -13,8 +13,11 @@ export const getCurrentHistoryId = async function (client: gmail_v1.Gmail) {
   return data.historyId!;
 };
 
+// Not filtered to INBOX, so mail the user sends shows up too: a sent message in a thread
+// is how a reply made from Gmail itself is noticed.
 export const listAddedInboxMessageIds = async function (client: gmail_v1.Gmail, startHistoryId: string) {
   const ids = new Set<string>();
+  const sentThreadIds = new Set<string>();
   let historyId = startHistoryId;
   let pageToken: string | undefined;
 
@@ -24,14 +27,15 @@ export const listAddedInboxMessageIds = async function (client: gmail_v1.Gmail, 
         userId: "me",
         startHistoryId,
         historyTypes: ["messageAdded"],
-        labelId: "INBOX",
         maxResults: 500,
         ...(pageToken && { pageToken }),
       });
 
       for (const record of data.history ?? []) {
         for (const added of record.messagesAdded ?? []) {
-          if (added.message?.id) ids.add(added.message.id);
+          const labels = added.message?.labelIds ?? [];
+          if (added.message?.id && labels.includes("INBOX")) ids.add(added.message.id);
+          if (added.message?.threadId && labels.includes("SENT")) sentThreadIds.add(added.message.threadId);
         }
       }
 
@@ -43,7 +47,7 @@ export const listAddedInboxMessageIds = async function (client: gmail_v1.Gmail, 
     throw error;
   }
 
-  return { ids: [...ids], historyId };
+  return { ids: [...ids], sentThreadIds: [...sentThreadIds], historyId };
 };
 
 export const listUnreadInboxPage = async function (

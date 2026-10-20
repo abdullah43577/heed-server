@@ -11,6 +11,7 @@ import { redis } from "../lib/redis-connection";
 import { EmailMessageRepository } from "../repositories/email-message.repository";
 import { MailAccountRepository } from "../repositories/mail-account.repository";
 import { MailAccountService } from "./mail-account.service";
+import { ReplyWorkerService } from "./reply-worker.service";
 import { TriageService } from "./triage.service";
 
 const LOCK_TTL_SECONDS = 120;
@@ -35,6 +36,7 @@ export class MailSyncService {
   private emailMessageRepo = new EmailMessageRepository();
   private mailAccountService = new MailAccountService();
   private triageService = new TriageService();
+  private replyWorker = new ReplyWorkerService();
 
   async syncAllAccounts() {
     try {
@@ -71,8 +73,10 @@ export class MailSyncService {
         return 0;
       }
 
-      const { ids, historyId } = await this.findNewMessageIds(client, account);
+      const { ids, sentThreadIds, historyId } = await this.findNewMessageIds(client, account);
       const added = await this.storeNew(client, account, ids);
+      // Before the cursor moves, so a failure here is retried rather than losing the "you replied" signal.
+      await this.replyWorker.resolveRepliedElsewhere(client, account, sentThreadIds);
       await this.saveCursor(account, historyId, startedAt);
       await this.triageService.triagePending(client, account);
 
@@ -97,7 +101,7 @@ export class MailSyncService {
       // Capture the new cursor first, so mail landing during the catch-up shows up in the next history read.
       const historyId = await getCurrentHistoryId(client);
       const since = new Date((account.lastSyncedAt ?? new Date()).getTime() - FALLBACK_OVERLAP_MS);
-      return { ids: await listInboxMessageIdsSince(client, since), historyId };
+      return { ids: await listInboxMessageIdsSince(client, since), sentThreadIds: [], historyId };
     }
   }
 
