@@ -135,3 +135,34 @@ export const fetchIncomingMessage = async function (
     receivedAt: new Date(Number(data.internalDate ?? Date.now())),
   };
 };
+
+export interface ReadableMessage {
+  gmailMessageId: string;
+  gmailThreadId: string;
+  fromName: string | null;
+  fromEmail: string;
+  to: string;
+  subject: string;
+  receivedAt: Date;
+  labels: string[];
+  bodyText: string;
+}
+
+// Ask's read: who, when and what it says, for an answer to quote. Nothing here is stored.
+export const fetchReadableMessage = async function (client: gmail_v1.Gmail, id: string): Promise<ReadableMessage> {
+  const { data } = await client.users.messages.get({ userId: "me", id, format: "full" });
+  const headers = data.payload?.headers ?? [];
+  const from = parseAddress(header(headers, "From"));
+
+  return {
+    gmailMessageId: data.id!,
+    gmailThreadId: data.threadId!,
+    fromName: from.name,
+    fromEmail: from.email,
+    to: header(headers, "To"),
+    subject: header(headers, "Subject") || "(no subject)",
+    receivedAt: new Date(Number(data.internalDate ?? Date.now())),
+    labels: data.labelIds ?? [],
+    bodyText: extractBodyText(data.payload),
+  };
+};

@@ -91,6 +91,14 @@ export class EmailMessageRepository {
     return new Set(rows.map(row => row.gmailMessageId));
   }
 
+  async findIdsByGmailIds(mailAccountId: string, userId: string, gmailMessageIds: string[]) {
+    const rows = await prisma.emailMessage.findMany({
+      where: { mailAccountId, userId, gmailMessageId: { in: gmailMessageIds } },
+      select: { id: true, gmailMessageId: true },
+    });
+    return new Map(rows.map(row => [row.gmailMessageId, row.id]));
+  }
+
   async findPendingTriage(mailAccountId: string, userId: string, take: number) {
     return prisma.emailMessage.findMany({
       where: { mailAccountId, userId, category: null, backlogRunId: null },

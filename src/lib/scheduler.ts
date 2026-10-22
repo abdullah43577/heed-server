@@ -67,10 +67,10 @@ const runSends = singleFlight("Sends", async () => {
 });
 
 const runRetention = singleFlight("Retention", async () => {
-  const { messages, reports } = await dailyReportService.applyRetention();
+  const { messages, reports, conversations } = await dailyReportService.applyRetention();
   const { expired } = await backlogService.expireStale();
-  return messages > 0 || reports > 0 || expired > 0
-    ? `🧹 Retention: ${messages} messages, ${reports} reports, ${expired} stale backlog runs`
+  return messages > 0 || reports > 0 || conversations > 0 || expired > 0
+    ? `🧹 Retention: ${messages} messages, ${reports} reports, ${conversations} Ask conversations, ${expired} stale backlog runs`
     : null;
 });
 

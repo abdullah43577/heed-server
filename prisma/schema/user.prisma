@@ -20,12 +20,13 @@ model User {
   createdAt           DateTime      @default(now())
   updatedAt           DateTime      @updatedAt
 
-  settings      UserSettings?
-  notifications Notification[]
-  mailAccounts  MailAccount[]
-  emailMessages EmailMessage[]
-  senderRules   SenderRule[]
-  dailyReports  DailyReport[]
-  backlogRuns   BacklogRun[]
-  replyDrafts   ReplyDraft[]
+  settings         UserSettings?
+  notifications    Notification[]
+  mailAccounts     MailAccount[]
+  emailMessages    EmailMessage[]
+  senderRules      SenderRule[]
+  dailyReports     DailyReport[]
+  backlogRuns      BacklogRun[]
+  replyDrafts      ReplyDraft[]
+  askConversations AskConversation[]
 }

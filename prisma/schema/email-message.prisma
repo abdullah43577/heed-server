@@ -43,7 +43,7 @@ model EmailMessage {
   decidedBy      TriageSource?
   summary        String?
   reason         String?
-  triageAttempts Int           @default(0)
+  triageAttempts Int            @default(0)
   triagedAt      DateTime?
 
   // Set when a backlog run found it; live triage leaves these rows alone.

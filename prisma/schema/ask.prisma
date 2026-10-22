@@ -1,0 +1,34 @@
+enum AskRole {
+  USER
+  ASSISTANT
+}
+
+model AskConversation {
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // The first question, cut short: a name for the history list, never generated.
+  title String
+
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+  messages  AskMessage[]
+
+  @@index([userId, updatedAt])
+}
+
+model AskMessage {
+  id             String          @id @default(cuid())
+  conversationId String
+  conversation   AskConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  role      AskRole
+  content   String
+  // AskCitation[]: the emails an answer used, sender and subject only, matched to its [n] markers in code.
+  citations Json?
+
+  createdAt DateTime @default(now())
+
+  @@index([conversationId, createdAt])
+}

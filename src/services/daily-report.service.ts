@@ -2,6 +2,7 @@ import { Prisma } from "../generated/prisma/client";
 import { NotFoundError } from "../lib/errors";
 import { computeTotals, reportHeadline, reportPush } from "../lib/reports/totals";
 import { isValidTimeZone, localNow, zonedTimeToUtc } from "../lib/timezone";
+import { AskRepository } from "../repositories/ask.repository";
 import { DailyReportRepository } from "../repositories/daily-report.repository";
 import { EmailMessageRepository } from "../repositories/email-message.repository";
 import { NotificationService } from "./notification.service";
@@ -10,12 +11,14 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 const MAX_PERIOD_MS = 2 * DAY_MS;
 const MESSAGE_RETENTION_MS = 30 * DAY_MS;
 const REPORT_RETENTION_MS = 90 * DAY_MS;
+const ASK_RETENTION_MS = 30 * DAY_MS;
 
 const DEFAULT_SETTINGS = { reportTime: "18:00", timezone: "UTC" };
 
 export class DailyReportService {
   private dailyReportRepo = new DailyReportRepository();
   private emailMessageRepo = new EmailMessageRepository();
+  private askRepo = new AskRepository();
   private notificationService = new NotificationService();
 
   async getReports(userId: string) {
@@ -57,7 +60,8 @@ export class DailyReportService {
   async applyRetention(now = new Date()) {
     const messages = await this.emailMessageRepo.deleteCreatedBefore(new Date(now.getTime() - MESSAGE_RETENTION_MS));
     const reports = await this.dailyReportRepo.deleteCreatedBefore(new Date(now.getTime() - REPORT_RETENTION_MS));
-    return { messages: messages.count, reports: reports.count };
+    const conversations = await this.askRepo.deleteUpdatedBefore(new Date(now.getTime() - ASK_RETENTION_MS));
+    return { messages: messages.count, reports: reports.count, conversations: conversations.count };
   }
 
   private async createDueReport(userId: string, settings: { reportTime: string; timezone: string }, now: Date) {

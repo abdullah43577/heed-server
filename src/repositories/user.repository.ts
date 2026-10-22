@@ -15,6 +15,13 @@ export class UserRepository {
     });
   }
 
+  async findNameAndTimezone(id: string) {
+    return prisma.user.findUnique({
+      where: { id },
+      select: { first_name: true, last_name: true, settings: { select: { timezone: true } } },
+    });
+  }
+
   async createUser(data: Prisma.UserCreateInput) {
     return prisma.user.create({ data });
   }

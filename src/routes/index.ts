@@ -1,5 +1,6 @@
 import type { Application, NextFunction, Request, Response } from "express";
 import { handleErrors } from "../lib/handle-errors";
+import { askRouter } from "./ask.routes";
 import { authRouter } from "./auth.routes";
 import { backlogRunRouter } from "./backlog-run.routes";
 import { replyDraftRouter } from "./reply-draft.routes";
@@ -19,6 +20,7 @@ export const registerRoutes = (app: Application) => {
   app.use("/v1/reports", dailyReportRouter);
   app.use("/v1/backlog", backlogRunRouter);
   app.use("/v1/drafts", replyDraftRouter);
+  app.use("/v1/ask", askRouter);
   app.use("/v1/maintenance", maintenanceRouter);
 
   app.use((req: Request, res: Response) => {
