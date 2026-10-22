@@ -1,11 +1,15 @@
-import { baseLayout } from "./layout";
+import { baseLayout, paragraph, stepsBlock } from "./layout";
 
 export function welcomeTemplate({ name }: { name: string }) {
-  const content = `
-    <h2 style="margin:0 0 12px; color:#18181b; font-size:20px;">Welcome to Heed, ${name}</h2>
-    <p style="margin:0; color:#52525b; font-size:14px; line-height:1.5;">
-      Connect your Gmail and Heed will start reading the mail that doesn't need you, so you only see what does.
-    </p>
-  `;
-  return baseLayout(content);
+  return baseLayout({
+    eyebrow: "Welcome",
+    title: `Welcome to Heed, ${name}`,
+    body:
+      paragraph("Connect your Gmail and Heed will start reading the mail that doesn't need you, so you only see what does.") +
+      stepsBlock([
+        { title: "Connect a Gmail account", detail: "Profile, then Gmail accounts. Up to five." },
+        { title: "Heed reads new mail", detail: "Updates and receipts are marked read for you. Anything unclear is left alone." },
+        { title: "You only reply", detail: "When someone is waiting on you, a draft is ready. Nothing is sent until you tap Send." },
+      ]),
+  });
 }

@@ -15,4 +15,12 @@ export const configureApp = (app: Application) => {
   );
   app.use(express.urlencoded({ extended: false, limit: "10mb" }));
   app.use(helmet());
+  // Email images are fetched by mail clients on other origins; helmet's default same-origin CORP would block them.
+  app.use(
+    "/static",
+    express.static("public", {
+      maxAge: "30d",
+      setHeaders: res => res.setHeader("Cross-Origin-Resource-Policy", "cross-origin"),
+    }),
+  );
 };
