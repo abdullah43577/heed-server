@@ -53,16 +53,27 @@ export const computeBacklogCounts = function (rows: CountRow[]): BacklogCounts {
   return counts;
 };
 
+// With nothing waiting to be marked read there is nothing to confirm, so the run is finished, not READY.
+export const hasNothingToApply = (counts: BacklogCounts) => counts.toMarkRead === 0 && counts.unsorted === 0;
+
 const formatCount = (count: number) => count.toLocaleString("en-US");
 
+// Null when the run found nothing worth a push: no mail at all, or only mail the user had already dealt with.
 export const backlogReadyPush = function (counts: BacklogCounts) {
-  const parts = [
-    counts.toMarkRead > 0 && `${formatCount(counts.toMarkRead)} ready to mark as read`,
-    counts.mightNeedReply > 0 && `${formatCount(counts.mightNeedReply)} might still need a reply`,
-  ].filter((part): part is string => !!part);
+  const title = "Your backlog is sorted";
+  const mightNeedReply = counts.mightNeedReply > 0 && `${formatCount(counts.mightNeedReply)} might still need a reply`;
 
-  return {
-    title: "Your backlog is sorted",
-    body: parts.length > 0 ? `${parts.join(" · ")}. Nothing changes until you confirm.` : "Nothing in it needs tidying.",
-  };
+  if (counts.toMarkRead > 0) {
+    const parts = [`${formatCount(counts.toMarkRead)} ready to mark as read`, mightNeedReply].filter(
+      (part): part is string => !!part,
+    );
+    return { title, body: `${parts.join(" · ")}. Nothing changes until you confirm.` };
+  }
+
+  const setAside = [mightNeedReply, counts.leftForYou > 0 && `${formatCount(counts.leftForYou)} left for you`].filter(
+    (part): part is string => !!part,
+  );
+  if (setAside.length === 0) return null;
+
+  return { title, body: `Nothing to mark as read. ${setAside.join(" · ")}.` };
 };

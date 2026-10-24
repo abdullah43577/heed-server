@@ -1,4 +1,4 @@
-import { computeBacklogCounts } from "../lib/backlog/summary";
+import { computeBacklogCounts, hasNothingToApply, type BacklogCounts } from "../lib/backlog/summary";
 import { AppError, ConflictError, NotFoundError } from "../lib/errors";
 import { gmailFor, GmailAccessRevokedError } from "../lib/gmail/client";
 import { ensureHeedLabels } from "../lib/gmail/labels";
@@ -32,7 +32,7 @@ export class BacklogService {
       if (account.status !== "ACTIVE") throw needsReauth();
 
       const active = await this.backlogRunRepo.findActiveForAccount(account.id, userId);
-      if (active) throw new AppError("A tidy is already running for this account", 409, "BACKLOG_IN_PROGRESS");
+      if (active && !(await this.settleIfNothingToApply(active))) throw new AppError("A tidy is already running for this account", 409, "BACKLOG_IN_PROGRESS");
 
       const run = await this.backlogRunRepo.create({ userId, mailAccountId: account.id, windowDays: data.windowDays });
 
@@ -54,22 +54,39 @@ export class BacklogService {
   // Counts are worked out from the rows on every read, so a "No reply needed" since shows straight away.
   async getRun(id: string, userId: string) {
     try {
-      const run = await this.backlogRunRepo.findById(id, userId);
-      if (!run) throw new NotFoundError("Backlog run not found");
+      const found = await this.backlogRunRepo.findById(id, userId);
+      if (!found) throw new NotFoundError("Backlog run not found");
+
+      const rows = await this.emailMessageRepo.countForRun(id, userId);
+      const summary = computeBacklogCounts(rows);
+      const run = (await this.settleIfNothingToApply(found, summary)) ?? found;
 
       const showLists = run.status === "READY" || run.status === "DONE";
-      const [rows, mightNeedReply, leftForYou] = await Promise.all([
-        this.emailMessageRepo.countForRun(id, userId),
+      const [mightNeedReply, leftForYou] = await Promise.all([
         showLists
           ? this.emailMessageRepo.findForRun(id, userId, { category: "NEEDS_REPLY", action: { not: "MARKED_READ" } })
           : [],
         showLists ? this.emailMessageRepo.findForRun(id, userId, { category: "UNSURE" }) : [],
       ]);
 
-      return { ...run, summary: computeBacklogCounts(rows), mightNeedReply, leftForYou };
+      return { ...run, summary, mightNeedReply, leftForYou };
     } catch (error) {
       throw error;
     }
+  }
+
+  // Runs that went READY with nothing to confirm, before the worker finished those as DONE, are settled on sight.
+  private async settleIfNothingToApply(run: { id: string; userId: string; status: string }, summary?: BacklogCounts) {
+    if (run.status !== "READY") return null;
+    const counts = summary ?? computeBacklogCounts(await this.emailMessageRepo.countForRun(run.id, run.userId));
+    if (!hasNothingToApply(counts)) return null;
+
+    const settled = await this.backlogRunRepo.transition(run.id, run.userId, ["READY"], {
+      status: "DONE",
+      finishedAt: new Date(),
+      markedRead: 0,
+    });
+    return settled ? await this.backlogRunRepo.findById(run.id, run.userId) : null;
   }
 
   async apply(id: string, userId: string) {

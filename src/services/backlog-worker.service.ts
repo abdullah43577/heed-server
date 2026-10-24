@@ -1,7 +1,7 @@
 import type { gmail_v1 } from "@googleapis/gmail";
 import type { BacklogRun, EmailCategory, EmailMessage, SenderRule } from "../generated/prisma/client";
 import { generateJson } from "../lib/ai";
-import { backlogReadyPush, computeBacklogCounts } from "../lib/backlog/summary";
+import { backlogReadyPush, computeBacklogCounts, hasNothingToApply } from "../lib/backlog/summary";
 import { gmailFor, GmailAccessRevokedError, isGmailNotFound } from "../lib/gmail/client";
 import { listUnreadInboxPage } from "../lib/gmail/history";
 import { fetchIncomingMessage, fetchMessagePreview, type IncomingMessage, type MessagePreview } from "../lib/gmail/message";
@@ -323,12 +323,22 @@ export class BacklogWorkerService {
 
   private async finishSorting(run: WorkerRun) {
     const counts = computeBacklogCounts(await this.emailMessageRepo.countForRun(run.id, run.userId));
-    await this.move(run, ["SORTING"], { status: "READY", readyAt: new Date(), counts: { ...counts } });
+    const now = new Date();
+    await this.move(
+      run,
+      ["SORTING"],
+      hasNothingToApply(counts)
+        ? { status: "DONE", readyAt: now, finishedAt: now, markedRead: 0, counts: { ...counts } }
+        : { status: "READY", readyAt: now, counts: { ...counts } },
+    );
+
+    const push = backlogReadyPush(counts);
+    if (!push) return;
 
     await this.notificationService.notify({
       userId: run.userId,
       type: "BACKLOG_READY",
-      ...backlogReadyPush(counts),
+      ...push,
       entityType: "backlog-run",
       entityId: run.id,
     });
