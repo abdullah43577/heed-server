@@ -6,6 +6,7 @@ import type { SignInFormValues, SignUpFormValues } from "../schemas/auth";
 import crypto from "crypto";
 import { redis } from "../lib/redis-connection";
 import { otpAttempts } from "../lib/rate-limit";
+import { MailAccountService } from "./mail-account.service";
 import { MailService } from "./mail.service";
 import { NotificationService } from "./notification.service";
 import type { UpdateProfile, UpdateSettings } from "../schemas/profile";
@@ -14,6 +15,7 @@ export class AuthService {
   private userRepo = new UserRepository();
   private mailService = new MailService();
   private notificationService = new NotificationService();
+  private mailAccountService = new MailAccountService();
   private static generateOTP = () => crypto.randomInt(100000, 1000000).toString();
 
   // Matches the client's resend countdown so the two never disagree.
@@ -238,6 +240,7 @@ export class AuthService {
   }
 
   // Hard delete: every owned model cascades on userId, so this one delete removes everything.
+  // Google grants go first, or Heed would stay in the user's Google "connected apps".
   async deleteAccount(userId: string, password: string) {
     try {
       const user = await this.userRepo.findUniqueUser({ id: userId }, { id: true, password: true });
@@ -247,6 +250,7 @@ export class AuthService {
       const isMatch = await comparePassword(password, user.password);
       if (!isMatch) throw new BadRequestError("Password Invalid");
 
+      await this.mailAccountService.revokeAll(userId);
       await this.userRepo.deleteUser(userId);
 
       return true;

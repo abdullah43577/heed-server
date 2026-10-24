@@ -114,6 +114,18 @@ export class MailAccountService {
     }
   }
 
+  // Account deletion: a failed revoke must not block the delete, so each grant is settled on its own.
+  async revokeAll(userId: string) {
+    const accounts = await this.mailAccountRepo.findManyByUser(userId);
+
+    await Promise.allSettled(
+      accounts.map(async (account) => {
+        await revokeToken(decrypt(account.refreshTokenEnc));
+        await forgetAccessToken(account.id);
+      }),
+    );
+  }
+
   async disconnect(id: string, userId: string) {
     try {
       const account = await this.mailAccountRepo.findById(id, userId);
